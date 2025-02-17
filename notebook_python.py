@@ -75,6 +75,43 @@ total_data.shape
 total_data.dtypes
 
 # %% [markdown]
+# **Surrogate Key-Based Incremental Loading**
+# 
+
+# %%
+# Fetch the last loaded ID from the metadata table
+connection = sqlite3.connect("demo.db")
+cursor = connection.cursor()
+cursor.execute("CREATE TABLE IF NOT EXISTS etl_metadata (last_loaded_id INTEGER)")
+cursor.execute("SELECT MAX(last_loaded_id) FROM etl_metadata")
+result = cursor.fetchone()
+last_loaded_id = result[0] if result[0] is not None else 0
+
+print(f"Last Loaded ID: {last_loaded_id}")
+
+# Extract new records (where ID is greater than last loaded ID)
+query = f"SELECT * FROM total_table WHERE id > {last_loaded_id}"
+new_data = pd.read_sql(query, connection)
+
+if not new_data.empty:
+    print(f"New Records Found: {len(new_data)}")
+
+    # Append new records to the target table
+    new_data.to_sql("stroke_data_target", connection, if_exists="append", index=False)
+
+    # Update metadata table with the latest ID
+    new_max_id = new_data["id"].max()
+    cursor.execute("INSERT INTO etl_metadata (last_loaded_id) VALUES (?)", (new_max_id,))
+    connection.commit()
+
+    print(f"ETL Completed. Updated last_loaded_id to {new_max_id}.")
+else:
+    print("No new records found. Skipping Surrogate Loading.")
+
+# Close connection
+connection.close()
+
+# %% [markdown]
 # **📌Key Measures of Tendencies:**
 # 
 
