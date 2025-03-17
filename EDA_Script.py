@@ -3,12 +3,6 @@
 # 
 
 # %%
-# ignore the warnings
-
-import warnings
-warnings.simplefilter(action = "ignore", category = FutureWarning)
-
-# %%
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -16,6 +10,16 @@ import matplotlib.pyplot as plt
 import scipy.stats as st
 import sqlite3
 from tabulate import tabulate
+import plotly.graph_objs as go
+import plotly.offline as pyo
+import plotly.figure_factory as ff
+import plotly.express as px
+from plotly import tools
+from plotly.subplots import make_subplots
+from plotly.offline import iplot 
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler , OneHotEncoder
+from sklearn.compose import ColumnTransformer
 
 # %% [markdown]
 # **Dataset attributes**
@@ -42,7 +46,7 @@ from tabulate import tabulate
 # %%
 connection= sqlite3.connect("data_source.db")
 query = "SELECT * FROM raw_data"
-data = pd.read_sql(query, connection)
+df = pd.read_sql(query, connection)
 
 # %% [markdown]
 # # Overview of the dataset
@@ -53,7 +57,7 @@ data = pd.read_sql(query, connection)
 # 
 
 # %%
-print(data.shape)
+print(df.shape)
 
 # %% [markdown]
 # Interpretation
@@ -66,7 +70,7 @@ print(data.shape)
 # 
 
 # %%
-print(data.columns)
+print(df.columns)
 
 # %% [markdown]
 # **data.head() and data.tail() methods**
@@ -77,10 +81,10 @@ print(data.columns)
 # 
 
 # %%
-data.head
+df.head
 
 # %%
-data.tail
+df.tail
 
 # %% [markdown]
 # **data.info() method**
@@ -89,7 +93,7 @@ data.tail
 # 
 
 # %%
-data.info()
+df.info()
 
 # %% [markdown]
 # **Interpretation**
@@ -104,9 +108,8 @@ data.info()
 # 
 
 # %%
-sns.histplot(data['bmi'], kde=True, bins=30)
-plt.title("Histogram of BMI")
-plt.show()
+hist = go.Figure(go.Histogram(x = df['bmi']))
+iplot(hist)
 
 # %% [markdown]
 # **Interpretation**
@@ -122,14 +125,14 @@ plt.show()
 
 # %%
 # Fill missing values with median
-data['bmi'].fillna(data['bmi'].median(), inplace=True)
+df['bmi'].fillna(df['bmi'].median(), inplace=True)
 
 # %% [markdown]
 # Checking the missing values after filling the missing values in bmi
 # 
 
 # %%
-data.info()
+df.info()
 
 # %% [markdown]
 # **tabulate the data**
@@ -137,7 +140,7 @@ data.info()
 
 # %%
 # Convert DataFrame to a table
-table = tabulate(data, headers='keys', tablefmt='pretty', showindex=False)
+table = tabulate(df, headers='keys', tablefmt='pretty', showindex=False)
 
 # Print the table
 print(table)
@@ -149,7 +152,7 @@ print(table)
 # 
 
 # %%
-print(data.describe())
+print(df.describe())
 
 # %% [markdown]
 # Constructing new attribute 'age_category' based on age to categorize people
@@ -158,14 +161,14 @@ print(data.describe())
 # 
 
 # %%
-data['age_category'] = np.where(data['age'] < 16, 'Pediatric', 'Adult')
+df['age_category'] = np.where(df['age'] < 16, 'Pediatric', 'Adult')
 
 # %% [markdown]
 # Checking the new attribute in the dataset
 # 
 
 # %%
-print(data.info())
+print(df.info())
 
 # %% [markdown]
 # Constructing new attribute 'avg_glucose_level' based on age to categorize people
@@ -175,16 +178,16 @@ print(data.info())
 
 # %%
 conditions = [
-    data['avg_glucose_level'] < 100,
-    (data['avg_glucose_level'] >= 100) & (data['avg_glucose_level'] < 126),
-    data['avg_glucose_level'] >= 126
+    df['avg_glucose_level'] < 100,
+    (df['avg_glucose_level'] >= 100) & (df['avg_glucose_level'] < 126),
+    df['avg_glucose_level'] >= 126
 ]
 
 categories = ['Normal', 'Prediabetic', 'Diabetic']
 
-data['glucose_category'] = np.select(conditions, categories)
+df['glucose_category'] = np.select(conditions, categories)
 
-print(data.info())
+print(df.info())
 
 
 # %% [markdown]
@@ -205,7 +208,7 @@ print(data.info())
 # %%
 #assert that there are no missing values in the dataframe
 
-assert pd.notnull(data).all().all()
+assert pd.notnull(df).all().all()
 
 # %% [markdown]
 # Interpretation
@@ -227,7 +230,7 @@ assert pd.notnull(data).all().all()
 # 
 
 # %%
-print(data['stroke'].describe())
+print(df['stroke'].describe())
 
 # %% [markdown]
 # **Interpretation**
@@ -259,7 +262,7 @@ print(data['stroke'].describe())
 # 
 
 # %%
-data['stroke'].skew()
+df['stroke'].skew()
 
 # %% [markdown]
 # **Interpretation of skewness**
@@ -269,11 +272,19 @@ data['stroke'].skew()
 # We can confirm this by plotting a Seaborn distplot diagram as follows:-
 # 
 
+# %% [markdown]
+# **Stroke Distribution**
+# 
+
 # %%
-plt.figure(figsize= (6,4))
-sns.distplot(data["stroke"])
-plt.title("Distribution of stroke")
-plt.show()
+counts=df['stroke'].value_counts()
+
+fig_distribution = go.Figure(data=go.Bar(x=counts.index,y=counts.values, marker_color=['pink','blue']))
+
+fig_distribution.update_layout(title="Distribution of Stroke Variable", xaxis_title="Stroke (0 = No, 1 = Yes)", yaxis_title="Count",
+template="plotly_dark")
+
+fig_distribution.show()
 
 # %% [markdown]
 # **Conclusion**
@@ -292,35 +303,38 @@ plt.show()
 # 
 
 # %%
-data['ever_married'].value_counts()
+df['ever_married'].value_counts()
 
 
 # %%
-# Plot
-plt.figure(figsize=(8, 5))
-sns.countplot(data=data, x="ever_married", hue="stroke", palette="coolwarm")
+scaler= StandardScaler()
+numeric_features = ['age', 'hypertension', 'heart_disease', 'avg_glucose_level', 'bmi']
+categorical_features = ['smoking_status', 'Residence_type','ever_married', 'work_type']
 
-# Labels
-plt.xlabel("Ever Married")
-plt.ylabel("Count")
-plt.title("Stroke Count Based on Marriage Status")
-plt.legend(title="Stroke", labels=["No Stroke (0)", "Stroke (1)"])
+encoder = OneHotEncoder(handle_unknown='ignore', drop='first')
 
-# Show plot
-plt.show()
+preprocessor = ColumnTransformer([('num', scaler, numeric_features), ('cat', encoder, categorical_features)])
+
+scaled_data = preprocessor.fit_transform(df)
 
 # %%
-# Plot
-plt.figure(figsize=(8, 5))
-sns.countplot(data=data, x="smoking_status", hue="stroke", palette="coolwarm")
+pca = PCA(n_components=2)
+pca_result = pca.fit_transform(scaled_data)
 
-# Labels
-plt.xlabel("Smoking Status")
-plt.ylabel("Count")
-plt.title("Stroke Count Based on Smoking Status")
-plt.legend(title="Stroke", labels=["No Stroke (0)", "Stroke (1)"])
+# %%
+pca_figure = go.Figure()
+pca_figure.add_trace(go.Scatter(x=pca_result[:, 0], y=pca_result[:, 1], mode='markers',marker=dict(color=df['stroke'], showscale=True, size=10),
+    text=df.index
+))
+pca_figure.update_layout(title='PCA of Stroke Data', xaxis_title='pca1', yaxis_title='pca2')
+pca_figure.show()
 
-# Show plot
-plt.show()
+# %% [markdown]
+# **Load transformation into sqlite database**
+# 
+
+# %%
+new_connection= sqlite3.connect("enriched_data.db")
+df.to_sql("clean_stroke", new_connection, if_exists="replace")
 
 
