@@ -14,7 +14,7 @@ df = pd.read_csv("healthcare-dataset-stroke-data.csv")
 
 # %%
 # Changing the id column name to mrn(medical record number)
-df.rename(columns={"id": "mrn"}, inplace=True)
+
 
 # %%
 # Testing the id column has been changed to mrn
@@ -23,14 +23,6 @@ df.columns
 # %%
 connection = sqlite3.connect("data_source.db")
 df.to_sql("original_data", connection, if_exists="replace")
-
-# %%
-# Delete the database file
-if os.path.exists("source_data.db"):
-    os.remove("source_data.db")
-    print("Database 'source_data.db' has been deleted.")
-else:
-    print("Database 'source_data.db' does not exist.")
 
 # %%
 print(df.columns)  # Check if 'mrn' is in the column list
@@ -62,7 +54,7 @@ synthesizer.fit(data_sql)
 
 # %%
 # Generate synthetic data (same number of rows as original data)
-synthetic_data = synthesizer.sample(num_rows=len(data_sql))
+synthetic_data = synthesizer.sample(num_rows=2*len(data_sql))
 
 print("\nSynthetic Data:")
 print(synthetic_data.head())
